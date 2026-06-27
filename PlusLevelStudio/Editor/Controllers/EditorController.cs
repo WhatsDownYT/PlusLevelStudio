@@ -75,6 +75,7 @@ namespace PlusLevelStudio.Editor
 
         public Selector selector;
         public Selector selectorPrefab;
+        public EditorSelectionManager selectionManager;
 
         public GridManager gridManagerPrefab;
         public GridManager gridManager;
@@ -395,6 +396,7 @@ namespace PlusLevelStudio.Editor
                 heldInteractable = null;
             }
             SwitchToTool(null); // remove our current tool
+            selectionManager?.ClearSelection();
             IEditorVisualizable[] visuals = objectVisuals.Keys.ToArray();
             sidebarUpdatesSuppressed = true;
             foreach (var item in visuals)
@@ -610,6 +612,7 @@ namespace PlusLevelStudio.Editor
             }
             objectVisuals.Add(visualizable, visual);
             visualizable.InitializeVisual(visual);
+            selectionManager?.RefreshHighlights();
         }
 
         static FieldInfo _lightMap = AccessTools.Field(typeof(EnvironmentController), "lightMap");
@@ -671,6 +674,7 @@ namespace PlusLevelStudio.Editor
         public void RemoveVisual(IEditorVisualizable visualizable)
         {
             if (!objectVisuals.ContainsKey(visualizable)) return;
+            selectionManager?.RemoveVisualizable(visualizable);
             visualizable.CleanupVisual(objectVisuals[visualizable]);
             GameObject.DestroyImmediate(objectVisuals[visualizable]); // TODO: Destroy or DestroyImmediate?
             objectVisuals.Remove(visualizable);
@@ -970,6 +974,7 @@ namespace PlusLevelStudio.Editor
                 kvp.Key.UpdateVisual(kvp.Value);
             }
             roomVisuals.ForEach(x => x.RoomUpdated());
+            selectionManager?.RefreshHighlights();
         }
 
         /// <summary>
@@ -983,6 +988,7 @@ namespace PlusLevelStudio.Editor
                 throw new Exception("Attempted to non-existant visual: " + visualizable.ToString() + "!");
             }
             visualizable.UpdateVisual(objectVisuals[visualizable]);
+            selectionManager?.RefreshHighlights();
         }
 
         /// <summary>
@@ -1245,6 +1251,12 @@ namespace PlusLevelStudio.Editor
         /// <param name="tool"></param>
         public virtual void SwitchToTool(EditorTool tool)
         {
+            // Selection tools keep the multi-selection tint when swapping between selection modes or returning to no tool.
+            bool keepEditorSelection = (tool != null && tool.preservesEditorSelection) || (tool == null && _currentTool != null && _currentTool.preservesEditorSelection);
+            if (!keepEditorSelection)
+            {
+                selectionManager?.ClearSelection();
+            }
             selector.DisableSelection(); // deselect whatever we had selected
             UnhighlightAllCells();
             if (_currentTool != null)
@@ -1268,6 +1280,10 @@ namespace PlusLevelStudio.Editor
                 CursorController.Instance.Blink(1);
             }
             ((EditorCursorController)CursorController.Instance).SetIcon((_currentTool == null) ? null : _currentTool.sprite);
+            if (keepEditorSelection)
+            {
+                selectionManager?.RefreshHighlights();
+            }
         }
 
         /// <summary>
@@ -1383,6 +1399,7 @@ namespace PlusLevelStudio.Editor
                     {
                         if ((currentTool == null))
                         {
+                            selectionManager?.ClearSelection();
                             if (interactable.OnClicked())
                             {
                                 heldInteractable = interactable;
@@ -1399,6 +1416,10 @@ namespace PlusLevelStudio.Editor
                 {
                     if ((currentTool == null) || interactable.InteractableByTool(currentTool))
                     {
+                        if (currentTool == null)
+                        {
+                            selectionManager?.ClearSelection();
+                        }
                         if (interactable.OnClicked())
                         {
                             heldInteractable = interactable;
@@ -1421,7 +1442,8 @@ namespace PlusLevelStudio.Editor
                     mousePressedLastFrame = mousePressedThisFrame;
                     if (mousePressedThisFrame)
                     {
-                        if (HandleInteractableClicking()) return;
+                        // Some tools like the selection need the click to start on top of editor objects instead of activating them
+                        if (currentTool.allowsInteractableClicking && HandleInteractableClicking()) return;
                         if (currentTool == null) return;
                         if (currentTool.MousePressed()) { SwitchToTool(null); return; }
                     }
@@ -1520,6 +1542,7 @@ namespace PlusLevelStudio.Editor
 
         protected virtual void SelectTile(IntVector2 tileSelected)
         {
+            selectionManager?.ClearSelection();
             UnhighlightAllCells(); // TODO: investigate performance?
             CellArea area = levelData.AreaFromPos(tileSelected, true);
             if (area != null)
@@ -1626,6 +1649,7 @@ namespace PlusLevelStudio.Editor
                 levelData.premadeRooms[i].ModifyCellDisplay(this);
             }
             UnhighlightAllCells();
+            selectionManager?.RefreshHighlights();
             UpdateStructuresWithReason(PotentialStructureUpdateReason.CellChange);
             if (!refreshLights) return;
             RefreshLights();
@@ -1687,6 +1711,7 @@ namespace PlusLevelStudio.Editor
             currentFile.meta = new EditorFileMeta();
             customContent = new EditorCustomContent();
             levelData = new EditorLevelData(new IntVector2(50,50));
+            selectionManager = new EditorSelectionManager(this);
             gridManager = GameObject.Instantiate(gridManagerPrefab);
             gridManager.editor = this;
             camera = GameObject.Instantiate(cameraPrefab);

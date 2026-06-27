@@ -63,6 +63,8 @@ namespace PlusLevelStudio
             }
             AddToolsToCategory(modeToModify, "tools", new EditorTool[]
             {
+                new SelectionTool(SelectionToolMode.Screen),
+                new SelectionTool(SelectionToolMode.Grid),
                 new MergeTool(),
                 new DeleteTool(),
                 new BrushTool(),

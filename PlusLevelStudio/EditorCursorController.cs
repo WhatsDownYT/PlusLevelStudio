@@ -15,10 +15,21 @@ namespace PlusLevelStudio
             if (sprite == null)
             {
                 toolIcon.enabled = false;
+                toolIcon.color = Color.white;
                 return;
             }
             toolIcon.enabled = true;
             toolIcon.sprite = sprite;
+            toolIcon.color = Color.white;
+        }
+
+        /// <summary>
+        /// Sets the tint used by the active tool icon.
+        /// </summary>
+        /// <param name="color">The color to tint the icon with.</param>
+        public void SetIconColor(Color color)
+        {
+            toolIcon.color = color;
         }
     }
 }

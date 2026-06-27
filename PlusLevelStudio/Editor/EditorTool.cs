@@ -29,6 +29,16 @@ namespace PlusLevelStudio.Editor
         public Sprite frameOverride;
 
         /// <summary>
+        /// Whether switching to or from this tool should preserve the editor's multi-selection highlight.
+        /// </summary>
+        public virtual bool preservesEditorSelection => false;
+
+        /// <summary>
+        /// Whether editor interactables should get the click before this tool handles it.
+        /// </summary>
+        public virtual bool allowsInteractableClicking => true;
+
+        /// <summary>
         /// Called when the tool is selected/picked up
         /// </summary>
         public abstract void Begin();
